@@ -13,7 +13,11 @@
 	<classpathentry kind="lib" path="test/lib/fest/jcip-annotations-1.0.jar"/>
 	<classpathentry kind="lib" path="test/lib/fest/MRJToolkitStubs-1.0.jar"/>
 	<classpathentry kind="lib" path="test/lib/jfcunit.jar"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jdk1.7.0_76"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
+		<accessrules>
+			<accessrule kind="accessible" pattern="*"/>
+		</accessrules>
+	</classpathentry>
 	<classpathentry exported="true" kind="con" path="GROOVY_SUPPORT"/>
 	<classpathentry kind="lib" path="test/lib/unitils-core/commons-collections-3.2.jar"/>
 	<classpathentry kind="lib" path="test/lib/unitils-core/commons-lang-2.3.jar"/>
@@ -21,5 +25,11 @@
 	<classpathentry kind="lib" path="test/lib/unitils-core/ognl-2.6.9.jar"/>
 	<classpathentry kind="lib" path="test/lib/unitils-core/unitils-core-3.3.jar"/>
 	<classpathentry kind="lib" path="test/lib/fest/debug-1.0.jar"/>
+	<classpathentry kind="lib" path="jogamp-all-platforms/jar/jogl-all.jar" sourcepath="jogamp-all-platforms/jogl-java-src.zip">
+		<attributes>
+			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="josm/jogamp-all-platforms/lib/linux-amd64"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="jogamp-all-platforms/jar/gluegen.jar" sourcepath="jogamp-all-platforms/gluegen-java-src.zip"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

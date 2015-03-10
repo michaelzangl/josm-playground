@@ -31,7 +31,7 @@ public class LineElemStyle extends ElemStyle {
     }
     public static final LineElemStyle UNTAGGED_WAY = createSimpleLineStyle(null, false);
 
-    private BasicStroke line;
+    public BasicStroke line;
     public Color color;
     public Color dashesBackground;
     public float offset;

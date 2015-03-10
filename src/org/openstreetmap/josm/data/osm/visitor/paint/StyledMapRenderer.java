@@ -188,10 +188,10 @@ public class StyledMapRenderer extends AbstractMapRenderer {
         }
     }
 
-    private static class StyleRecord implements Comparable<StyleRecord> {
-        final ElemStyle style;
-        final OsmPrimitive osm;
-        final int flags;
+    public static class StyleRecord implements Comparable<StyleRecord> {
+        public final ElemStyle style;
+        public final OsmPrimitive osm;
+        public final int flags;
 
         public StyleRecord(ElemStyle style, OsmPrimitive osm, int flags) {
             this.style = style;
@@ -398,6 +398,9 @@ public class StyledMapRenderer extends AbstractMapRenderer {
      * @param text text style to use
      */
     private void displayText(GlyphVector gv, String s, int x, int y, boolean disabled, TextElement text) {
+        if (true) {
+            return;
+        }
         if (isInactiveMode || disabled) {
             g.setColor(inactiveColor);
             if (gv != null) {
@@ -435,6 +438,9 @@ public class StyledMapRenderer extends AbstractMapRenderer {
 
     protected void drawArea(OsmPrimitive osm, Path2D.Double path, Color color, MapImage fillImage, boolean disabled, TextElement text) {
 
+        if (true) {
+            return;
+        }
         Shape area = path.createTransformedShape(nc.getAffineTransform());
 
         if (!isOutlineOnly) {
@@ -461,6 +467,9 @@ public class StyledMapRenderer extends AbstractMapRenderer {
     }
 
     private void drawAreaText(OsmPrimitive osm, TextElement text, Shape area) {
+        if (true) {
+            return;
+        }
         if (text != null && isShowNames()) {
             // abort if we can't compose the label to be rendered
             if (text.labelCompositionStrategy == null) return;
@@ -535,6 +544,9 @@ public class StyledMapRenderer extends AbstractMapRenderer {
     }
 
     public void drawArea(Relation r, Color color, MapImage fillImage, boolean disabled, TextElement text) {
+        if (true) {
+            return;
+        }
         Multipolygon multipolygon = MultipolygonCache.getInstance().get(nc, r);
         if (!r.isDisabled() && !multipolygon.getOuterWays().isEmpty()) {
             for (PolyData pd : multipolygon.getCombinedPolygons()) {
@@ -554,6 +566,9 @@ public class StyledMapRenderer extends AbstractMapRenderer {
     }
 
     public void drawBoxText(Node n, BoxTextElemStyle bs) {
+        if (true) {
+            return;
+        }
         if (!isShowNames() || bs == null)
             return;
 
@@ -623,6 +638,9 @@ public class StyledMapRenderer extends AbstractMapRenderer {
      * can be aligned with the way.
      */
     public void drawRepeatImage(Way way, MapImage pattern, boolean disabled, float offset, float spacing, float phase, LineImageAlignment align) {
+        if (true) {
+            return;
+        }
         final int imgWidth = pattern.getWidth();
         final double repeat = imgWidth + spacing;
         final int imgHeight = pattern.getHeight();
@@ -704,6 +722,9 @@ public class StyledMapRenderer extends AbstractMapRenderer {
 
     @Override
     public void drawNode(Node n, Color color, int size, boolean fill) {
+        if (true) {
+            return;
+        }
         if(size <= 0 && !n.isHighlighted())
             return;
 
@@ -731,6 +752,9 @@ public class StyledMapRenderer extends AbstractMapRenderer {
     }
 
     public void drawNodeIcon(Node n, MapImage img, boolean disabled, boolean selected, boolean member) {
+        if (true) {
+            return;
+        }
         Point p = nc.getPoint(n);
 
         final int w = img.getWidth(), h = img.getHeight();
@@ -761,6 +785,9 @@ public class StyledMapRenderer extends AbstractMapRenderer {
     }
 
     public void drawNodeSymbol(Node n, Symbol s, Color fillColor, Color strokeColor) {
+        if (true) {
+            return;
+        }
         Point p = nc.getPoint(n);
         int radius = s.size / 2;
 
@@ -896,6 +923,9 @@ public class StyledMapRenderer extends AbstractMapRenderer {
     }
 
     public void drawRestriction(Relation r, MapImage icon, boolean disabled) {
+        if (true) {
+            return;
+        }
         Way fromWay = null;
         Way toWay = null;
         OsmPrimitive via = null;
@@ -1069,7 +1099,7 @@ public class StyledMapRenderer extends AbstractMapRenderer {
     }
 
     public void drawTextOnPath(Way way, TextElement text) {
-        if (way == null || text == null)
+        if (way == null || text == null || true)
             return;
         String name = text.getString(way);
         if (name == null || name.isEmpty())
@@ -1363,7 +1393,7 @@ public class StyledMapRenderer extends AbstractMapRenderer {
             }
             lastPoint = p;
         }
-        if(way.isHighlighted()) {
+        if(way.isHighlighted() && false) {
             drawPathHighlight(path, line);
         }
         displaySegments(path, orientationArrows, onewayArrows, onewayArrowsCasing, color, line, dashes, dashedColor);
@@ -1395,7 +1425,7 @@ public class StyledMapRenderer extends AbstractMapRenderer {
         isOutlineOnly = paintSettings.isOutlineOnly();
         orderFont = new Font(Main.pref.get("mappaint.font", "Droid Sans"), Font.PLAIN, Main.pref.getInteger("mappaint.fontsize", 8));
 
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+      if (g != null)  g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                 Main.pref.getBoolean("mappaint.use-antialiasing", true) ?
                         RenderingHints.VALUE_ANTIALIAS_ON : RenderingHints.VALUE_ANTIALIAS_OFF);
 
@@ -1571,7 +1601,7 @@ public class StyledMapRenderer extends AbstractMapRenderer {
         public void add(Relation osm, int flags) {
             StyleList sl = styles.get(osm, circum, nc);
             for (ElemStyle s : sl) {
-                if (drawMultipolygon && drawArea && s instanceof AreaElemStyle && (flags & FLAG_DISABLED) == 0) {
+                if (drawMultipolygon && drawArea && s instanceof AreaElemStyle && (flags & FLAG_DISABLED) == 0 && false) {
                     output.add(new StyleRecord(s, osm, flags));
                 } else if (drawRestriction && s instanceof NodeElemStyle) {
                     output.add(new StyleRecord(s, osm, flags));
@@ -1582,7 +1612,7 @@ public class StyledMapRenderer extends AbstractMapRenderer {
         public void add(Way osm, int flags) {
             StyleList sl = styles.get(osm, circum, nc);
             for (ElemStyle s : sl) {
-                if (!(drawArea && (flags & FLAG_DISABLED) == 0) && s instanceof AreaElemStyle) {
+                if ((!(drawArea && (flags & FLAG_DISABLED) == 0) || true) && s instanceof AreaElemStyle) {
                     continue;
                 }
                 output.add(new StyleRecord(s, osm, flags));
@@ -1590,7 +1620,7 @@ public class StyledMapRenderer extends AbstractMapRenderer {
         }
     }
 
-    private class ConcurrentTasksHelper {
+    public class ConcurrentTasksHelper {
 
         private final List<StyleRecord> allStyleElems;
         private final DataSet data;
@@ -1600,7 +1630,7 @@ public class StyledMapRenderer extends AbstractMapRenderer {
             this.data = data;
         }
 
-        void process(List<? extends OsmPrimitive> prims) {
+        public void process(List<? extends OsmPrimitive> prims) {
             final List<ComputeStyleListWorker> tasks = new ArrayList<>();
             final int bucketsize = Math.max(100, prims.size()/THREAD_POOL.a/3);
             final int noBuckets = (prims.size() + bucketsize - 1) / bucketsize;
@@ -1641,11 +1671,11 @@ public class StyledMapRenderer extends AbstractMapRenderer {
             highlightWaySegments = data.getHighlightedWaySegments();
 
             long timeStart=0, timePhase1=0, timeFinished;
-            if (Main.isTraceEnabled()) {
+           // if (Main.isTraceEnabled()) {
                 timeStart = System.currentTimeMillis();
                 System.err.print("BENCHMARK: rendering ");
                 Main.debug(null);
-            }
+           // }
 
             List<Node> nodes = data.searchNodes(bbox);
             List<Way> ways = data.searchWays(bbox);
@@ -1663,10 +1693,10 @@ public class StyledMapRenderer extends AbstractMapRenderer {
             helper.process(relations);
             helper.process(new CompositeList<>(nodes, ways));
 
-            if (Main.isTraceEnabled()) {
+         //   if (Main.isTraceEnabled()) {
                 timePhase1 = System.currentTimeMillis();
                 System.err.print("phase 1 (calculate styles): " + (timePhase1 - timeStart) + " ms");
-            }
+          //  }
 
             Collections.sort(allStyleElems); // TODO: try parallel sort when switching to Java 8
 
@@ -1681,11 +1711,11 @@ public class StyledMapRenderer extends AbstractMapRenderer {
                 );
             }
 
-            if (Main.isTraceEnabled()) {
+           // if (Main.isTraceEnabled()) {
                 timeFinished = System.currentTimeMillis();
                 System.err.println("; phase 2 (draw): " + (timeFinished - timePhase1) + " ms; total: " + (timeFinished - timeStart) + " ms" +
                     " (scale: " + circum + " zoom level: " + Selector.GeneralSelector.scale2level(circum) + ")");
-            }
+          //  }
 
             drawVirtualNodes(data, bbox);
         } finally {

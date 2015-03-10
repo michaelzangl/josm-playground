@@ -15,7 +15,6 @@ import org.openstreetmap.josm.data.osm.Node;
 import org.openstreetmap.josm.data.osm.Way;
 import org.openstreetmap.josm.data.osm.WaySegment;
 import org.openstreetmap.josm.gui.NavigatableComponent;
-import org.openstreetmap.josm.tools.CheckParameterUtil;
 
 /**
  * <p>Abstract common superclass for {@link Rendering} implementations.</p>
@@ -63,8 +62,8 @@ public abstract class AbstractMapRenderer implements Rendering {
      * @throws IllegalArgumentException thrown if {@code nc} is null
      */
     public AbstractMapRenderer(Graphics2D g, NavigatableComponent nc, boolean isInactiveMode) throws IllegalArgumentException{
-        CheckParameterUtil.ensureParameterNotNull(g);
-        CheckParameterUtil.ensureParameterNotNull(nc);
+        //CheckParameterUtil.ensureParameterNotNull(g);
+        //CheckParameterUtil.ensureParameterNotNull(nc);
         this.g = g;
         this.nc = nc;
         this.isInactiveMode = isInactiveMode;

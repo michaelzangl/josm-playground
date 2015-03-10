@@ -34,6 +34,7 @@ import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JSplitPane;
+import javax.swing.JTabbedPane;
 import javax.swing.JToolBar;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
@@ -42,6 +43,8 @@ import javax.swing.event.PopupMenuEvent;
 import javax.swing.event.PopupMenuListener;
 import javax.swing.plaf.basic.BasicSplitPaneDivider;
 import javax.swing.plaf.basic.BasicSplitPaneUI;
+
+import opengltest.OpenGlView;
 
 import org.openstreetmap.josm.Main;
 import org.openstreetmap.josm.actions.LassoModeAction;
@@ -96,6 +99,8 @@ public class MapFrame extends JPanel implements Destroyable, LayerChangeListener
      * The view control displayed.
      */
     public final MapView mapView;
+
+    public final OpenGlView oglView;
 
     /**
      * This object allows to detect key press and release events
@@ -175,11 +180,17 @@ public class MapFrame extends JPanel implements Destroyable, LayerChangeListener
             new FileDrop(mapView);
         }
 
+        oglView = new OpenGlView(mapView);
+
         splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, true);
 
         leftPanel = new JPanel();
         leftPanel.setLayout(new GridBagLayout());
-        leftPanel.add(mapView, GBC.std().fill());
+        JTabbedPane mapViewSwitcher = new JTabbedPane();
+        mapViewSwitcher.addTab("Default", mapView);
+        mapViewSwitcher.addTab("OpenGL", oglView);
+
+        leftPanel.add(mapViewSwitcher, GBC.std().fill());
         splitPane.setLeftComponent(leftPanel);
 
         dialogsPanel = new DialogsPanel(splitPane);

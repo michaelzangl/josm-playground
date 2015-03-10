@@ -80,7 +80,7 @@ public class WireframeMapRenderer extends AbstractMapRenderer implements Visitor
       * <code>DataSet</code> passed to the @{link render} function to overcome the argument
       * limitations of @{link Visitor} interface. Only valid until end of rendering call.
       */
-    private DataSet ds;
+    protected DataSet ds;
 
     /** Helper variable for {@link #drawSegment} */
     private static final double PHI = Math.toRadians(20);
@@ -224,7 +224,7 @@ public class WireframeMapRenderer extends AbstractMapRenderer implements Visitor
      * @param c Third value
      * @param d Fourth value
      */
-    private static final int max(int a, int b, int c, int d) {
+    protected static final int max(int a, int b, int c, int d) {
         return Math.max(Math.max(a, b), Math.max(c, d));
     }
 
@@ -277,7 +277,7 @@ public class WireframeMapRenderer extends AbstractMapRenderer implements Visitor
         }
     }
 
-    private boolean isNodeTagged(Node n) {
+    protected boolean isNodeTagged(Node n) {
         return n.isTagged() || n.isAnnotated();
     }
 
