@@ -49,7 +49,6 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.openstreetmap.josm.Main;
 import org.openstreetmap.josm.data.Version;
 
@@ -743,25 +742,9 @@ public final class Utils {
                 return getZipInputStream(in);
             case "application/x-gzip":
                 return getGZipInputStream(in);
-            case "application/x-bzip2":
-                return getBZip2InputStream(in);
             }
         }
         return in;
-    }
-
-    /**
-     * Returns a Bzip2 input stream wrapping given input stream.
-     * @param in The raw input stream
-     * @return a Bzip2 input stream wrapping given input stream, or {@code null} if {@code in} is {@code null}
-     * @throws IOException if the given input stream does not contain valid BZ2 header
-     * @since 7867
-     */
-    public static BZip2CompressorInputStream getBZip2InputStream(InputStream in) throws IOException {
-        if (in == null) {
-            return null;
-        }
-        return new BZip2CompressorInputStream(in, /* see #9537 */ true);
     }
 
     /**

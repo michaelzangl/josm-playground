@@ -208,8 +208,6 @@ Build-Date: ${build.tstamp}
         <exec executable="${xjc}" failonerror="true">
             <arg value="-d"/>
             <arg value="${src.dir}"/>
-            <arg value="-encoding"/>
-            <arg value="UTF-8"/>
             <arg value="data_nodist/wms-cache.xsd"/>
         </exec>
     </target>

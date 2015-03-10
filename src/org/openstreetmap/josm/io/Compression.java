@@ -12,7 +12,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipOutputStream;
 
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
 import org.openstreetmap.josm.tools.Utils;
 
 /**
@@ -58,8 +57,6 @@ public enum Compression {
      */
     public InputStream getUncompressedInputStream(InputStream in) throws IOException {
         switch (this) {
-            case BZIP2:
-                return Utils.getBZip2InputStream(in);
             case GZIP:
                 return Utils.getGZipInputStream(in);
             case ZIP:
@@ -96,8 +93,6 @@ public enum Compression {
      */
     public OutputStream getCompressedOutputStream(OutputStream out) throws IOException {
         switch (this) {
-            case BZIP2:
-                return new BZip2CompressorOutputStream(out);
             case GZIP:
                 return new GZIPOutputStream(out);
             case ZIP:
