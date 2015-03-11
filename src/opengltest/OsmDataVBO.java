@@ -88,7 +88,8 @@ public class OsmDataVBO implements Comparable<OsmDataVBO> {
     }
 
     public void addTriangle(float x1, float y1, float x2, float y2, float x3, float y3, float u1, float v1, float u2,
-            float v2, float u3, float v3, int activeColor1, int activeColor2, int activeColor3) throws BufferFullException {
+            float v2, float u3, float v3, int activeColor1, int activeColor2, int activeColor3)
+            throws BufferFullException {
         if (currentTriangles > BUFFER_TRIANGLES - 1) {
             throw new BufferFullException();
         }
@@ -135,8 +136,9 @@ public class OsmDataVBO implements Comparable<OsmDataVBO> {
     }
 
     // Add a line segment (6 triangles).
-    private void addLineSegment(Point start, Point end, Color color, float lineWidth, float blurWidth)
-            throws BufferFullException {
+    private void addLineSegment(Point beforeStart, Point start, Point end, Point afterEnd, Color color,
+            float lineWidth, float blurWidth) throws BufferFullException {
+        float npx, npy, nnx, nny;
         float x1 = start.x;
         float y1 = start.y;
         float x2 = end.x;
@@ -144,48 +146,89 @@ public class OsmDataVBO implements Comparable<OsmDataVBO> {
 
         float nx = x1 - x2;
         float ny = y1 - y2;
-
         float ns = (float) Math.hypot(nx, ny);
         nx /= ns;
         ny /= ns;
         ny *= -1;
 
-        float nx1 = nx * lineWidth / 2;
-        float ny1 = ny * lineWidth / 2;
+        if (beforeStart != null) {
+            npx = beforeStart.x - x1;
+            npy = beforeStart.y - y1;
+            ns = (float) Math.hypot(npx, npy);
+            npx /= ns;
+            npy /= ns;
+            npy *= -1;
+        } else {
+            npx = nx;
+            npy = ny;
+        }
 
-        float nx2 = nx1 + nx * blurWidth;
-        float ny2 = ny1 + ny * blurWidth;
+        if (afterEnd != null) {
+            nnx = x2 - afterEnd.x;
+            nny = y2 - afterEnd.y;
+            ns = (float) Math.hypot(nnx, nny);
+            nnx /= ns;
+            nny /= ns;
+            nny *= -1;
+        } else {
+            nnx = nx;
+            nny = ny;
+        }
+
+        // extrusion normal at start.
+        // Project n on (np + n)
+        float a = (nx * (nx + npx) + ny * (ny + npy));
+        float nStartY = (npx + nx) / a;
+        float nStartX = (npy + ny) / a;
+        float b = (nnx * (nx + nnx) + nny * (ny + nny));
+        float nEndY = (nnx + nx) / b;
+        float nEndX = (nny + ny) / b;
 
         int activeColor = 0;
         // abgr
         activeColor = (0xff << 24) | (color.getRed() << 0) | (color.getGreen() << 8) | (color.getBlue() << 16);
-        addTriangle(x1 + ny1, y1 + nx1, x1 - ny1, y1 - nx1, x2 + ny1, y2 + nx1, 0, 0, 0, 0, 0, 0, activeColor, activeColor, activeColor);
-        addTriangle(x2 + ny1, y2 + nx1, x2 - ny1, y2 - nx1, x1 - ny1, y1 - nx1, 0, 0, 0, 0, 0, 0, activeColor, activeColor, activeColor);
+        addTriangle(x1 + (nStartX * lineWidth / 2), y1 + (nStartY * lineWidth / 2), x1 - (nStartX * lineWidth / 2), y1
+                - (nStartY * lineWidth / 2), x2 + (nEndX * lineWidth / 2), y2 + (nEndY * lineWidth / 2), 0, 0, 0, 0, 0,
+                0, activeColor, activeColor, activeColor);
+        addTriangle(x2 + (nEndX * lineWidth / 2), y2 + (nEndY * lineWidth / 2), x2 - (nEndX * lineWidth / 2), y2
+                - (nEndY * lineWidth / 2), x1 - (nStartX * lineWidth / 2), y1 - (nStartY * lineWidth / 2), 0, 0, 0, 0,
+                0, 0, activeColor, activeColor, activeColor);
 
-        // Blur
-        addTriangle(x1 + ny2, y1 + nx2, x1 + ny1, y1 + nx1, x2 + ny2, y2 + nx2, 0, 0, 0, 0, 0, 0, activeColor & 0xffffff, activeColor, activeColor & 0xffffff);
-        addTriangle(x2 + ny2, y2 + nx2, x2 + ny1, y2 + nx1, x1 + ny1, y1 + nx1, 0, 0, 0, 0, 0, 0, activeColor & 0xffffff, activeColor, activeColor);
+        if (blurWidth > 0) {
+            float s = lineWidth / 2 + blurWidth;
+            // Blur
+            addTriangle(x1 + (nStartX * s), y1 + (nStartY * s), x1 + (nStartX * lineWidth / 2), y1
+                    + (nStartY * lineWidth / 2), x2 + (nEndX * s), y2 + (nEndY * s), 0, 0, 0, 0, 0, 0,
+                    activeColor & 0xffffff, activeColor, activeColor & 0xffffff);
+            addTriangle(x2 + (nEndX * s), y2 + (nEndY * s), x2 + (nEndX * lineWidth / 2), y2 + (nEndY * lineWidth / 2),
+                    x1 + (nStartX * lineWidth / 2), y1 + (nStartY * lineWidth / 2), 0, 0, 0, 0, 0, 0,
+                    activeColor & 0xffffff, activeColor, activeColor);
 
-        // More blur
-        addTriangle(x1 - ny1, y1 - nx1, x1 - ny2, y1 - nx2, x2 - ny1, y2 - nx1, 0, 0, 0, 0, 0, 0, activeColor, activeColor & 0xffffff, activeColor);
-        addTriangle(x2 - ny1, y2 - nx1, x2 - ny2, y2 - nx2, x1 - ny2, y1 - nx2, 0, 0, 0, 0, 0, 0, activeColor, activeColor & 0xffffff, activeColor & 0xffffff);
-   }
+            // More blur
+            addTriangle(x1 - (nStartX * lineWidth / 2), y1 - (nStartY * lineWidth / 2), x1 - (nStartX * s), y1
+                    - (nStartY * s), x2 - (nEndX * lineWidth / 2), y2 - (nEndY * lineWidth / 2), 0, 0, 0, 0, 0, 0,
+                    activeColor, activeColor & 0xffffff, activeColor);
+            addTriangle(x2 - (nEndX * lineWidth / 2), y2 - (nEndY * lineWidth / 2), x2 - (nEndX * s), y2 - (nEndY * s),
+                    x1 - (nStartX * s), y1 - (nStartY * s), 0, 0, 0, 0, 0, 0, activeColor, activeColor & 0xffffff,
+                    activeColor & 0xffffff);
+
+        }
+    }
 
     public boolean addWithStyle(NavigatableComponent nc, OsmPrimitive osm, ElemStyle style) {
         int oldTris = currentTriangles;
         try {
             if (style instanceof LineElemStyle) {
-                Point lastPoint = null;
+                ArrayList<Point> points = new ArrayList<>();
                 Iterator<Point> it = new OffsetIterator(nc, ((Way) osm).getNodes(), 0);
                 while (it.hasNext()) {
-                    Point p = it.next();
-                    if (lastPoint != null) {
-                        Point p1 = lastPoint;
-                        Point p2 = p;
-                        addLineSegment(p1, p2, ((LineElemStyle) style).color,
-                                ((LineElemStyle) style).line.getLineWidth(), .7f);
-                    }
-                    lastPoint = p;
+                    points.add(it.next());
+                }
+
+                for (int i = 0; i < points.size() - 1; i++) {
+                    addLineSegment(i > 0 ? points.get(i - 1) : null, points.get(i), points.get(i + 1),
+                            i < points.size() - 2 ? points.get(i + 2) : null, ((LineElemStyle) style).color,
+                            ((LineElemStyle) style).line.getLineWidth(), .7f);
                 }
             } else if (style instanceof AreaElemStyle) {
             }
