@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -1009,36 +1010,49 @@ public class Preferences {
         return put("color."+colKey, val != null ? ColorHelper.color2html(val, true) : null);
     }
 
+    Hashtable<String, Long> cachedNumbers = new Hashtable<>();
+
     public synchronized int getInteger(String key, int def) {
-        String v = get(key, Integer.toString(def));
-        if(v.isEmpty())
-            return def;
+        Long l = cachedNumbers.get(key);
+        if (l != null)
+            return (int) (long) l;
+
+        int res = def;
+        String v = get(key);
 
         try {
-            return Integer.parseInt(v);
+            if(!v.isEmpty())
+                res = Integer.parseInt(v);
+            cachedNumbers.put(key, (long) res);
         } catch(NumberFormatException e) {
             // fall out
         }
-        return def;
+        return res;
     }
 
     public synchronized int getInteger(String key, String specName, int def) {
-        String v = get(key+"."+specName);
+        String specKey = key+"."+specName;
+        Long l = cachedNumbers.get(specKey);
+        if (l != null)
+            return (int) (long) l;
+
+        int res = def;
+        String v = get(specKey);
         if(v.isEmpty())
-            v = get(key,Integer.toString(def));
-        if(v.isEmpty())
-            return def;
+            v = get(key);
 
         try {
-            return Integer.parseInt(v);
+            if(!v.isEmpty())
+                res = Integer.parseInt(v);
+            cachedNumbers.put(specKey, (long) res);
         } catch(NumberFormatException e) {
             // fall out
         }
-        return def;
+        return res;
     }
 
     public synchronized long getLong(String key, long def) {
-        String v = get(key, Long.toString(def));
+        String v = get(key);
         if(null == v)
             return def;
 
@@ -1051,7 +1065,7 @@ public class Preferences {
     }
 
     public synchronized double getDouble(String key, double def) {
-        String v = get(key, Double.toString(def));
+        String v = get(key);
         if(null == v)
             return def;
 
@@ -1692,7 +1706,7 @@ public class Preferences {
                              if ("url".equals(mkey) && val.contains("josm.openstreetmap.de/josmfile") && !val.contains("zip=1")) {
                                  val += "&zip=1";
                                  modified = true;
-                                 
+
                              }
                              newmap.put(mkey, val);
                          }
