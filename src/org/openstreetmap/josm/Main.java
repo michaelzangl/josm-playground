@@ -341,7 +341,7 @@ public abstract class Main {
      * @since 6852
      */
     public static boolean isTraceEnabled() {
-        return logLevel >= 5;
+        return true || logLevel >= 5;
     }
 
     /**

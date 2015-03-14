@@ -12,13 +12,14 @@ import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -116,6 +117,17 @@ public class MapCSSStyleSource extends StyleSource {
         }
     }
 
+    private static class MergedRules {
+        private final ArrayList<MapCSSRule> rules;
+        private final MapCSSRule[] heap;
+
+        public MergedRules(ArrayList<MapCSSRule> rules) {
+            this.rules = rules;
+            this.heap = new MapCSSRule[rules.size() * 2 - 1];
+        }
+
+    }
+
     /**
      * A collection of {@link MapCSSRule}s, that are indexed by tag key and value.
      *
@@ -136,7 +148,8 @@ public class MapCSSStyleSource extends StyleSource {
         /* tag based index */
         public final Map<String,Map<String,Set<MapCSSRule>>> index = new HashMap<>();
         /* rules without SimpleKeyValueCondition */
-        public final Set<MapCSSRule> remaining = new HashSet<>();
+        public final ArrayList<MapCSSRule> remaining = new ArrayList<>();
+        public final HashSet<MapCSSRule> remaining2 = new HashSet<>();
 
         public void add(MapCSSRule rule) {
             rules.add(rule);
@@ -177,6 +190,15 @@ public class MapCSSStyleSource extends StyleSource {
                 }
                 rulesWithMatchingKeyValue.add(r);
             }
+            remaining2.addAll(remaining);
+            Collections.sort(remaining);
+
+            // remaining once was a hash set.
+            for (int i = remaining.size() - 1; i > 0; i--) {
+                if (remaining.get(i).equals(remaining.get(i - 1))) {
+                    remaining.remove(i);
+                }
+            }
         }
 
         /**
@@ -187,8 +209,8 @@ public class MapCSSStyleSource extends StyleSource {
          *
          * You must have a read lock of STYLE_SOURCE_LOCK when calling this method.
          */
-        public Collection<MapCSSRule> getRuleCandidates(OsmPrimitive osm) {
-            List<MapCSSRule> ruleCandidates = new ArrayList<>(remaining);
+        public PriorityQueue<MapCSSRule> getRuleCandidates(OsmPrimitive osm) {
+            PriorityQueue<MapCSSRule> ruleCandidates = new PriorityQueue<>(remaining);
             for (Map.Entry<String,String> e : osm.getKeys().entrySet()) {
                 Map<String,Set<MapCSSRule>> v = index.get(e.getKey());
                 if (v != null) {
@@ -198,8 +220,25 @@ public class MapCSSStyleSource extends StyleSource {
                     }
                 }
             }
-            Collections.sort(ruleCandidates);
             return ruleCandidates;
+        }
+
+        private static final MapCSSRule[] ruleArray = new MapCSSRule[0];
+
+        public MapCSSRule[] getRuleCandidatesOld(OsmPrimitive osm) {
+            ArrayList<MapCSSRule> ruleCandidates = new ArrayList<>(remaining2);
+            for (Map.Entry<String,String> e : osm.getKeys().entrySet()) {
+                Map<String,Set<MapCSSRule>> v = index.get(e.getKey());
+                if (v != null) {
+                    Set<MapCSSRule> rs = v.get(e.getValue());
+                    if (rs != null)  {
+                        ruleCandidates.addAll(rs);
+                    }
+                }
+            }
+            MapCSSRule[] result = ruleCandidates.toArray(ruleArray);
+            Arrays.sort(result);
+            return result;
         }
 
         /**
@@ -211,6 +250,7 @@ public class MapCSSStyleSource extends StyleSource {
             rules.clear();
             index.clear();
             remaining.clear();
+            remaining2.clear();
         }
     }
 
@@ -462,6 +502,9 @@ public class MapCSSStyleSource extends StyleSource {
         return backgroundColorOverride;
     }
 
+    public static long tNew = 0;
+    public static long tOld = 0;
+
     @Override
     public void apply(MultiCascade mc, OsmPrimitive osm, double scale, boolean pretendWayIsClosed) {
         Environment env = new Environment(osm, mc, null, this);
@@ -487,8 +530,38 @@ public class MapCSSStyleSource extends StyleSource {
         // the declaration indices are sorted, so it suffices to save the
         // last used index
         int lastDeclUsed = -1;
+        ArrayList<MapCSSRule> old = new ArrayList<>();
+        ArrayList<MapCSSRule> pq = new ArrayList<>();
 
-        for (MapCSSRule r : matchingRuleIndex.getRuleCandidates(osm)) {
+        // To avoid cache times.
+        matchingRuleIndex.getRuleCandidates(osm);
+        matchingRuleIndex.getRuleCandidatesOld(osm);
+
+        // ------------ New
+        long t1 = System.nanoTime();
+        PriorityQueue<MapCSSRule> candidates = matchingRuleIndex.getRuleCandidates(osm);
+        MapCSSRule r2;
+        while ((r2 = candidates.poll()) != null) {
+            pq.add(r2);
+        }
+
+        // ------------ Old
+        long t2 = System.nanoTime();
+        MapCSSRule[] candidatesOld = matchingRuleIndex.getRuleCandidatesOld(osm);
+        for(MapCSSRule r : candidatesOld) {
+            old.add(r);
+        }
+        long t3 = System.nanoTime();
+
+        // Now check result
+        if (old.size() != pq.size()) {
+            System.err.println("Warning: Rule count mismatch.");
+        }
+
+        tNew += t2 - t1;
+        tOld += t3 - t2;
+
+        for (MapCSSRule r : old) {
             env.clearSelectorMatchingInformation();
             env.layer = null;
             String sub = env.layer = r.selector.getSubpart().getId(env);
