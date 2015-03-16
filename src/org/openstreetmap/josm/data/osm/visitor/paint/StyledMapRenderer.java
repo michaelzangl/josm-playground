@@ -1647,6 +1647,9 @@ public class StyledMapRenderer extends AbstractMapRenderer {
                 Main.debug(null);
                 MapCSSStyleSource.tNew = 0;
                 MapCSSStyleSource.tOld = 0;
+                MapCSSStyleSource.rulesExecuted = 0;
+                MapCSSStyleSource.rulesGuessed = 0;
+                MapCSSStyleSource.elementsProcessed = 0;
             }
 
             List<Node> nodes = data.searchNodes(bbox);
@@ -1687,7 +1690,11 @@ public class StyledMapRenderer extends AbstractMapRenderer {
                 timeFinished = System.currentTimeMillis();
                 System.err.println("; phase 2 (draw): " + (timeFinished - timePhase1) + " ms; total: " + (timeFinished - timeStart) + " ms" +
                     " (scale: " + circum + " zoom level: " + Selector.GeneralSelector.scale2level(circum) + ")");
-                System.err.println("Old time: " + MapCSSStyleSource.tOld + ", new time: " + MapCSSStyleSource.tNew);
+                System.err.println("Old time: " + MapCSSStyleSource.tOld / 1000000 + ", new time: " + MapCSSStyleSource.tNew / 1000000);
+                System.err
+                        .println("Rules executed: " + MapCSSStyleSource.rulesExecuted + "/"
+                                + MapCSSStyleSource.rulesGuessed + " for " + MapCSSStyleSource.elementsProcessed
+                                + " elements.");
             }
 
             drawVirtualNodes(data, bbox);

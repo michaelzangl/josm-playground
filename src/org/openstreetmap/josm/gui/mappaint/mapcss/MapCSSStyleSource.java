@@ -14,12 +14,13 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -41,6 +42,10 @@ import org.openstreetmap.josm.gui.mappaint.StyleKeys;
 import org.openstreetmap.josm.gui.mappaint.StyleSetting;
 import org.openstreetmap.josm.gui.mappaint.StyleSetting.BooleanStyleSetting;
 import org.openstreetmap.josm.gui.mappaint.StyleSource;
+import org.openstreetmap.josm.gui.mappaint.mapcss.Condition.KeyCondition;
+import org.openstreetmap.josm.gui.mappaint.mapcss.Condition.KeyMatchType;
+import org.openstreetmap.josm.gui.mappaint.mapcss.Condition.KeyValueCondition;
+import org.openstreetmap.josm.gui.mappaint.mapcss.Condition.Op;
 import org.openstreetmap.josm.gui.mappaint.mapcss.Condition.SimpleKeyValueCondition;
 import org.openstreetmap.josm.gui.mappaint.mapcss.Selector.ChildOrParentSelector;
 import org.openstreetmap.josm.gui.mappaint.mapcss.Selector.GeneralSelector;
@@ -117,15 +122,61 @@ public class MapCSSStyleSource extends StyleSource {
         }
     }
 
-    private static class MergedRules {
-        private final ArrayList<MapCSSRule> rules;
+    private static class MergedRules implements Iterator<MapCSSRule>{
+        private final ArrayList<Iterator<MapCSSRule>> rules;
+        // Heap and head of each rule.
         private final MapCSSRule[] heap;
+        private int heapSize;
 
-        public MergedRules(ArrayList<MapCSSRule> rules) {
+        public MergedRules(ArrayList<Iterator<MapCSSRule>> rules) {
             this.rules = rules;
-            this.heap = new MapCSSRule[rules.size() * 2 - 1];
+            heapSize = rules.size() - 1;
+            this.heap = new MapCSSRule[heapSize + rules.size()];
+            for (int i = heap.length - 1; i >= 0; i--) {
+                // Pull the null values out.
+                pullOutOf(i);
+            }
         }
 
+        @Override
+        public boolean hasNext() {
+            return heap[0] != null;
+        }
+
+        @Override
+        public MapCSSRule next() {
+            return pullOutOf(0);
+        }
+
+        private MapCSSRule pullOutOf(int i) {
+            MapCSSRule next = heap[i];
+            if (i < heapSize) {
+                // Pull from two upper nodes.
+                int nextLeft = i * 2 + 1;
+                int nextRight = i * 2 + 2;
+                if (heap[nextLeft] == null) {
+                    heap[i] = pullOutOf(nextRight);
+                } else if (heap[nextRight] == null) {
+                    heap[i] = pullOutOf(nextLeft);
+                } else {
+                    if (heap[nextLeft].compareTo(heap[nextRight]) < 0) {
+                        heap[i] = pullOutOf(nextLeft);
+                    } else {
+                        heap[i] = pullOutOf(nextRight);
+                    }
+                }
+            } else {
+                // pull from iterator.
+                Iterator<MapCSSRule> it = rules.get(i - heapSize);
+                heap[i] = it.hasNext() ? it.next() : null;
+            }
+            return next;
+        }
+
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
     }
 
     /**
@@ -146,7 +197,8 @@ public class MapCSSStyleSource extends StyleSource {
         /* all rules for this index */
         public final List<MapCSSRule> rules = new ArrayList<>();
         /* tag based index */
-        public final Map<String,Map<String,Set<MapCSSRule>>> index = new HashMap<>();
+        public final Map<String,Map<String,ArrayList<MapCSSRule>>> index = new HashMap<>();
+        public final Map<String,ArrayList<MapCSSRule>> keyIndex = new HashMap<>();
         /* rules without SimpleKeyValueCondition */
         public final ArrayList<MapCSSRule> remaining = new ArrayList<>();
         public final HashSet<MapCSSRule> remaining2 = new HashSet<>();
@@ -170,35 +222,68 @@ public class MapCSSStyleSource extends StyleSource {
                 OptimizedGeneralSelector s = (OptimizedGeneralSelector) selRightmost;
                 if (s.conds == null) {
                     remaining.add(r);
+                    remaining2.add(r);
+                    System.out.println("No conds: " + r);
                     continue;
                 }
                 List<SimpleKeyValueCondition> sk = new ArrayList<>(Utils.filteredCollection(s.conds, SimpleKeyValueCondition.class));
-                if (sk.isEmpty()) {
-                    remaining.add(r);
-                    continue;
+                if (!sk.isEmpty()) {
+                    SimpleKeyValueCondition c = sk.get(sk.size() - 1);
+                    Map<String,ArrayList<MapCSSRule>> rulesWithMatchingKey = index.get(c.k);
+                    if (rulesWithMatchingKey == null) {
+                        rulesWithMatchingKey = new HashMap<>();
+                        index.put(c.k, rulesWithMatchingKey);
+                    }
+                    ArrayList<MapCSSRule> rulesWithMatchingKeyValue = rulesWithMatchingKey.get(c.v);
+                    if (rulesWithMatchingKeyValue == null) {
+                        rulesWithMatchingKeyValue = new ArrayList<>();
+                        rulesWithMatchingKey.put(c.v, rulesWithMatchingKeyValue);
+                    }
+                    rulesWithMatchingKeyValue.add(r);
+                } else {
+                    remaining2.add(r);
+                    String key = findRequiredKey(s.conds);
+                    if (key != null) {
+                        ArrayList<MapCSSRule> rulesWithMatchingKey = keyIndex.get(key);
+                        if (rulesWithMatchingKey == null) {
+                            rulesWithMatchingKey = new ArrayList<>();
+                            keyIndex.put(key, rulesWithMatchingKey);
+                        }
+                        rulesWithMatchingKey.add(r);
+                    } else {
+                        remaining.add(r);
+                        System.out.println("No key: " + r);
+                    }
                 }
-                SimpleKeyValueCondition c = sk.get(sk.size() - 1);
-                Map<String,Set<MapCSSRule>> rulesWithMatchingKey = index.get(c.k);
-                if (rulesWithMatchingKey == null) {
-                    rulesWithMatchingKey = new HashMap<>();
-                    index.put(c.k, rulesWithMatchingKey);
-                }
-                Set<MapCSSRule> rulesWithMatchingKeyValue = rulesWithMatchingKey.get(c.v);
-                if (rulesWithMatchingKeyValue == null) {
-                    rulesWithMatchingKeyValue = new HashSet<>();
-                    rulesWithMatchingKey.put(c.v, rulesWithMatchingKeyValue);
-                }
-                rulesWithMatchingKeyValue.add(r);
             }
-            remaining2.addAll(remaining);
             Collections.sort(remaining);
 
-            // remaining once was a hash set.
-            for (int i = remaining.size() - 1; i > 0; i--) {
-                if (remaining.get(i).equals(remaining.get(i - 1))) {
-                    remaining.remove(i);
+            for (Map<String, ArrayList<MapCSSRule>> e : index.values()) {
+                for (ArrayList<MapCSSRule> rules : e.values()) {
+                    Collections.sort(rules);
                 }
             }
+        }
+
+        // Copied
+        private static final Set<Op> NEGATED_OPS = EnumSet.of(Op.NEQ, Op.NREGEX);
+        // Any key required for this.
+        private String findRequiredKey(List<Condition> conds) {
+            String key = null;
+            for (Condition c : conds) {
+                if (c instanceof KeyCondition) {
+                    KeyCondition keyCondition = (KeyCondition) c;
+                    if (!keyCondition.negateResult && (keyCondition.matchType == KeyMatchType.FALSE || keyCondition.matchType == KeyMatchType.TRUE || keyCondition.matchType == KeyMatchType.EQ || keyCondition.matchType == null)) {
+                        key = keyCondition.label;
+                    }
+                } else if (c instanceof KeyValueCondition) {
+                    KeyValueCondition keyValueCondition = (KeyValueCondition) c;
+                    if (!NEGATED_OPS.contains(keyValueCondition)) {
+                        key = keyValueCondition.k;
+                    }
+                }
+            }
+            return key;
         }
 
         /**
@@ -209,18 +294,28 @@ public class MapCSSStyleSource extends StyleSource {
          *
          * You must have a read lock of STYLE_SOURCE_LOCK when calling this method.
          */
-        public PriorityQueue<MapCSSRule> getRuleCandidates(OsmPrimitive osm) {
-            PriorityQueue<MapCSSRule> ruleCandidates = new PriorityQueue<>(remaining);
+        public Iterator<MapCSSRule> getRuleCandidates(OsmPrimitive osm) {
+            ArrayList<Iterator<MapCSSRule>> ruleCandidates = new ArrayList<>();
+            ruleCandidates.add(remaining.iterator());
             for (Map.Entry<String,String> e : osm.getKeys().entrySet()) {
-                Map<String,Set<MapCSSRule>> v = index.get(e.getKey());
+                Map<String, ArrayList<MapCSSRule>> v = index.get(e.getKey());
                 if (v != null) {
-                    Set<MapCSSRule> rs = v.get(e.getValue());
+                    ArrayList<MapCSSRule> rs = v.get(e.getValue());
                     if (rs != null)  {
-                        ruleCandidates.addAll(rs);
+                        ruleCandidates.add(rs.iterator());
                     }
                 }
+                ArrayList<MapCSSRule> forKey = keyIndex.get(e.getKey());
+                if (forKey != null) {
+                    ruleCandidates.add(forKey.iterator());
+                }
             }
-            return ruleCandidates;
+            if (ruleCandidates.size() == 1) {
+                return ruleCandidates.get(0);
+            } else {
+                System.out.println("Found iterators: " + ruleCandidates.size());
+                return new MergedRules(ruleCandidates);
+            }
         }
 
         private static final MapCSSRule[] ruleArray = new MapCSSRule[0];
@@ -228,13 +323,17 @@ public class MapCSSStyleSource extends StyleSource {
         public MapCSSRule[] getRuleCandidatesOld(OsmPrimitive osm) {
             ArrayList<MapCSSRule> ruleCandidates = new ArrayList<>(remaining2);
             for (Map.Entry<String,String> e : osm.getKeys().entrySet()) {
-                Map<String,Set<MapCSSRule>> v = index.get(e.getKey());
+                Map<String, ArrayList<MapCSSRule>> v = index.get(e.getKey());
                 if (v != null) {
-                    Set<MapCSSRule> rs = v.get(e.getValue());
+                    ArrayList<MapCSSRule> rs = v.get(e.getValue());
                     if (rs != null)  {
                         ruleCandidates.addAll(rs);
                     }
                 }
+//                ArrayList<MapCSSRule> forKey = keyIndex.get(e.getKey());
+//                if (forKey != null) {
+//                    ruleCandidates.addAll(forKey);
+//                }
             }
             MapCSSRule[] result = ruleCandidates.toArray(ruleArray);
             Arrays.sort(result);
@@ -250,6 +349,7 @@ public class MapCSSStyleSource extends StyleSource {
             rules.clear();
             index.clear();
             remaining.clear();
+            keyIndex.clear();
             remaining2.clear();
         }
     }
@@ -504,6 +604,9 @@ public class MapCSSStyleSource extends StyleSource {
 
     public static long tNew = 0;
     public static long tOld = 0;
+    public static long rulesGuessed = 0;
+    public static long rulesExecuted = 0;
+    public static long elementsProcessed = 0;
 
     @Override
     public void apply(MultiCascade mc, OsmPrimitive osm, double scale, boolean pretendWayIsClosed) {
@@ -530,38 +633,56 @@ public class MapCSSStyleSource extends StyleSource {
         // the declaration indices are sorted, so it suffices to save the
         // last used index
         int lastDeclUsed = -1;
-        ArrayList<MapCSSRule> old = new ArrayList<>();
-        ArrayList<MapCSSRule> pq = new ArrayList<>();
 
-        // To avoid cache times.
-        matchingRuleIndex.getRuleCandidates(osm);
-        matchingRuleIndex.getRuleCandidatesOld(osm);
+        if (false) {
+            ArrayList<MapCSSRule> old = new ArrayList<>();
+            ArrayList<MapCSSRule> pq = new ArrayList<>();
 
-        // ------------ New
-        long t1 = System.nanoTime();
-        PriorityQueue<MapCSSRule> candidates = matchingRuleIndex.getRuleCandidates(osm);
-        MapCSSRule r2;
-        while ((r2 = candidates.poll()) != null) {
-            pq.add(r2);
+            // To avoid cache times.
+            matchingRuleIndex.getRuleCandidates(osm);
+            matchingRuleIndex.getRuleCandidatesOld(osm);
+
+            // ------------ New
+            long t1 = System.nanoTime();
+            Iterator<MapCSSRule> candidates = matchingRuleIndex.getRuleCandidates(osm);
+            while (candidates.hasNext()) {
+                pq.add(candidates.next());
+            }
+
+            // ------------ Old
+            long t2 = System.nanoTime();
+            MapCSSRule[] candidatesOld = matchingRuleIndex.getRuleCandidatesOld(osm);
+            for(MapCSSRule r : candidatesOld) {
+                old.add(r);
+            }
+            long t3 = System.nanoTime();
+
+            // Now check result
+//            if (old.size() != pq.size()) {
+//                System.err.println("Warning: Rule count mismatch.");
+//            } else {
+//                // Check elements.
+//                for (MapCSSRule e : old) {
+//                    if (!pq.contains(e)) {
+//                        System.err.println("Missing in list: " + e);
+//                    }
+//                }
+//            }
+            // Check for sorted:
+            for (int i = 0; i < pq.size() - 1; i++) {
+                if (pq.get(i).compareTo(pq.get(i+1)) > 0) {
+                    System.err.println("Warning: Order is wrong.");
+                }
+            }
+
+            tNew += t2 - t1;
+            tOld += t3 - t2;
         }
 
-        // ------------ Old
-        long t2 = System.nanoTime();
-        MapCSSRule[] candidatesOld = matchingRuleIndex.getRuleCandidatesOld(osm);
-        for(MapCSSRule r : candidatesOld) {
-            old.add(r);
-        }
-        long t3 = System.nanoTime();
-
-        // Now check result
-        if (old.size() != pq.size()) {
-            System.err.println("Warning: Rule count mismatch.");
-        }
-
-        tNew += t2 - t1;
-        tOld += t3 - t2;
-
-        for (MapCSSRule r : old) {
+        Iterator<MapCSSRule> ruleCandidates = matchingRuleIndex.getRuleCandidates(osm);
+        while (ruleCandidates.hasNext()) {
+            rulesGuessed++;
+            MapCSSRule r = ruleCandidates.next();
             env.clearSelectorMatchingInformation();
             env.layer = null;
             String sub = env.layer = r.selector.getSubpart().getId(env);
@@ -587,8 +708,10 @@ public class MapCSSStyleSource extends StyleSource {
                 }
                 env.layer = sub;
                 r.execute(env);
+                rulesExecuted++;
             }
         }
+        elementsProcessed++;
     }
 
     public boolean evalSupportsDeclCondition(String feature, Object val) {
